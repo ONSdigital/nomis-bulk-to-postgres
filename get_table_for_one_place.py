@@ -23,8 +23,6 @@ def main():
 
     con.close()
 
-    for row in rows:
-        print(row)
     print("CODE,NAME,VALUE")
     csvwriter = csv.writer(sys.stdout)
     for row in rows:
