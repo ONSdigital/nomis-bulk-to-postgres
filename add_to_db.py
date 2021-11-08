@@ -1,32 +1,34 @@
 import csv
 import glob
-import sqlite3
+import json
+import psycopg2
+from psycopg2.extras import execute_values
 from collections import namedtuple
 
 TABLES = [
     '''COUNTS(
-        count_id INTEGER PRIMARY KEY,
+        count_id SERIAL PRIMARY KEY,
         place_id INTEGER,
         year INTEGER,
         category_id INTEGER,
         count INTEGER
     )''',
     '''VARIABLES(
-        var_id INTEGER PRIMARY KEY,
+        var_id SERIAL PRIMARY KEY,
         var_name TEXT,
         population TEXT,
         nomis_table_code_2011 TEXT
     )''',
     '''CATEGORIES(
-        category_id INTEGER PRIMARY KEY,
+        category_id SERIAL PRIMARY KEY,
         var_id INTEGER,
-        category_name INTEGER,
-        measurement_unit INTEGER,
-        stat_unit INTEGER,
-        nomis_code_2011 INTEGER
+        category_name TEXT,
+        measurement_unit TEXT,
+        stat_unit TEXT,
+        nomis_code_2011 TEXT
     )''',
     '''LSOA2011_LAD2020_LOOKUP(
-        id INTEGER PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         lsoa2011code TEXT,
         lad2020code TEXT
     )''',
@@ -35,7 +37,7 @@ TABLES = [
         placetype_name TEXT
     )''',
     '''PLACES(
-        place_id INTEGER PRIMARY KEY,
+        place_id SERIAL PRIMARY KEY,
         place_code TEXT,
         place_name TEXT,
         placetype_id INTEGER
@@ -71,7 +73,7 @@ def add_meta_tables(cur):
         for d in csv_iter(filename):
             print(d)
             sql = '''insert into VARIABLES (var_name,population,nomis_table_code_2011)
-                      values (?,?,?)
+                      values (%s,%s,%s)
                       returning var_id;
                     '''
             cur.execute(sql, [d["DatasetTitle"], d["StatisticalPopulations"], d["DatasetId"]])
@@ -94,7 +96,7 @@ def add_desc_tables(cur, nomis_table_id_to_var_id):
             print("TABLECODE", table_code)
             var_id = nomis_table_id_to_var_id[table_code]
             sql = '''insert into CATEGORIES (var_id,category_name,measurement_unit,stat_unit,nomis_code_2011)
-                     values (?,?,?,?,?)
+                     values (%s,%s,%s,%s,%s)
                      returning category_id;
                   '''
             cur.execute(sql, [
@@ -116,14 +118,14 @@ def add_counts(cur, rows, placetype_id, place_code_to_id):
         if row[0] not in place_code_to_id:
             # This place code isn't in the places table yet, so add it.
             sql = '''insert into PLACES (place_code,place_name,placetype_id)
-                      values (?,?,?)
+                      values (%s,%s,%s)
                       returning place_id;
                     '''
             cur.execute(sql, (row[0], row[0] + " name TODO", placetype_id))
             place_code_to_id[row[0]] = cur.fetchone()[0]
         row[0] = place_code_to_id[row[0]]   # replace code with ID
-    sql = 'insert into COUNTS (place_id, year, category_id, count) values (?,?,?,?);'
-    cur.executemany(sql, rows)
+    sql = 'insert into COUNTS (place_id, year, category_id, count) values %s;'
+    execute_values(cur, sql, rows)   # Much faster than executemany
 
 def add_data_tables(cur, nomis_col_id_to_category_info, place_code_to_id):
     for data_file_num in ["01", "02", "03", "04", "05", "06"]:
@@ -151,26 +153,29 @@ def add_data_tables(cur, nomis_col_id_to_category_info, place_code_to_id):
 
 def create_place_types(cur, place_types):
     for placetype_id, placetype_name in place_types.items():
-        sql = 'insert into PLACE_TYPES (placetype_id,placetype_name) values (?,?)'
+        sql = 'insert into PLACE_TYPES (placetype_id,placetype_name) values (%s,%s)'
         cur.execute(sql, (placetype_id, placetype_name))
 
 def add_lsoa_lad_lookup(cur):
     for d in csv_iter("lookup/lsoa2011_lad2020.csv"):
         lsoa = d["code"]
         lad = "best_fit_" + d["parent"]
-        cur.execute('insert into LSOA2011_LAD2020_LOOKUP (lsoa2011code,lad2020code) values (?,?)', [lsoa, lad])
+        cur.execute('insert into LSOA2011_LAD2020_LOOKUP (lsoa2011code,lad2020code) values (%s,%s)', [lsoa, lad])
 
 def add_best_fit_lad2020_rows(cur, place_code_to_id):
     cur.execute(
         '''select lad2020code, year, category_id, sum(count) from (
                 select lad2020code, year, category_id, count from LSOA2011_LAD2020_LOOKUP
-                left join COUNTS on LSOA2011_LAD2020_LOOKUP.lsoa2011code = COUNTS.place_id
-            ) group by lad2020code, year, category_id;''')
+                    join PLACES on LSOA2011_LAD2020_LOOKUP.lsoa2011code = PLACES.place_code
+                    join COUNTS on PLACES.place_id = COUNTS.place_id
+            ) as A group by lad2020code, year, category_id;''')
     new_rows = [list(item) for item in cur.fetchall()]
     add_counts(cur, new_rows, 99, place_code_to_id)
 
 def main():
-    con = sqlite3.connect('census.db')
+    with open('secrets.json', 'r') as f:
+        credentials = json.load(f)
+    con = psycopg2.connect(**credentials)
     cur = con.cursor()
 
     place_code_to_id = {}  # a map from place code (e.g. "E09000001") to place_id in the PLACES table
