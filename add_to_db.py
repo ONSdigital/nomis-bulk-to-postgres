@@ -19,7 +19,7 @@ TABLES = [
         population TEXT,
         nomis_table_code_2011 TEXT
     )''',
-    '''CATEGORIES(
+    '''nomis_category(
         category_id SERIAL PRIMARY KEY,
         var_id INTEGER,
         category_name TEXT,
@@ -95,7 +95,7 @@ def add_desc_tables(cur, nomis_table_id_to_var_id):
             table_code = col_code[:pos+2]
             print("TABLECODE", table_code)
             var_id = nomis_table_id_to_var_id[table_code]
-            sql = '''insert into CATEGORIES (var_id,category_name,measurement_unit,stat_unit,nomis_code_2011)
+            sql = '''insert into nomis_category (var_id,category_name,measurement_unit,stat_unit,nomis_code_2011)
                      values (%s,%s,%s,%s,%s)
                      returning category_id;
                   '''

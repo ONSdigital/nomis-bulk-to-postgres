@@ -5,8 +5,8 @@ import sys
 
 def get_rows(table_code, place_code, cur):
     cur.execute('''select nomis_code_2011, category_name, count
-                    from counts join categories on counts.category_id=categories.category_id
-                    where categories.var_id = (select var_id from VARIABLES where nomis_table_code_2011 = %s)
+                    from counts join nomis_category on counts.category_id=nomis_category.category_id
+                    where nomis_category.var_id = (select var_id from VARIABLES where nomis_table_code_2011 = %s)
                     and counts.place_id = (select place_id from PLACES where place_code = %s)''', (table_code, place_code))
     return cur.fetchall()
 
