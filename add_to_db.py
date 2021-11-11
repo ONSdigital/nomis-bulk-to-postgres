@@ -8,7 +8,7 @@ from collections import namedtuple
 TABLES = [
     '''geo_metric(
         count_id SERIAL PRIMARY KEY,
-        place_id INTEGER,
+        geo_id INTEGER,
         year INTEGER,
         category_id INTEGER,
         count INTEGER
@@ -33,19 +33,19 @@ TABLES = [
         lsoa2011code TEXT,
         lad2020code TEXT
     )''',
-    '''place_types(
-        placetype_id INTEGER PRIMARY KEY,
-        placetype_name TEXT
+    '''geo_types(
+        geo_type_id INTEGER PRIMARY KEY,
+        geo_type_name TEXT
     )''',
-    '''places(
-        place_id SERIAL PRIMARY KEY,
-        place_code TEXT,
-        place_name TEXT,
-        placetype_id INTEGER
+    '''geo(
+        geo_id SERIAL PRIMARY KEY,
+        geo_code TEXT,
+        geo_name TEXT,
+        geo_type_id INTEGER
     )'''
 ]
 
-PLACE_TYPES = {
+GEO_TYPES = {
     1: "EW",
     2: "Country",
     3: "Region",
@@ -114,21 +114,21 @@ def add_desc_tables(cur, nomis_table_id_to_var_id):
         print()
     return nomis_col_id_to_category_info
 
-def add_counts(cur, rows, placetype_id, place_code_to_id):
+def add_counts(cur, rows, geo_type_id, geo_code_to_id):
     for row in rows:
-        if row[0] not in place_code_to_id:
-            # This place code isn't in the places table yet, so add it.
-            sql = '''insert into places (place_code,place_name,placetype_id)
+        if row[0] not in geo_code_to_id:
+            # This geo code isn't in the geo table yet, so add it.
+            sql = '''insert into geo (geo_code,geo_name,geo_type_id)
                       values (%s,%s,%s)
-                      returning place_id;
+                      returning geo_id;
                     '''
-            cur.execute(sql, (row[0], row[0] + " name TODO", placetype_id))
-            place_code_to_id[row[0]] = cur.fetchone()[0]
-        row[0] = place_code_to_id[row[0]]   # replace code with ID
-    sql = 'insert into geo_metric (place_id, year, category_id, count) values %s;'
+            cur.execute(sql, (row[0], row[0] + " name TODO", geo_type_id))
+            geo_code_to_id[row[0]] = cur.fetchone()[0]
+        row[0] = geo_code_to_id[row[0]]   # replace code with ID
+    sql = 'insert into geo_metric (geo_id, year, category_id, count) values %s;'
     execute_values(cur, sql, rows)   # Much faster than executemany
 
-def add_data_tables(cur, nomis_col_id_to_category_info, place_code_to_id):
+def add_data_tables(cur, nomis_col_id_to_category_info, geo_code_to_id):
     for data_file_num in ["01", "02", "03", "04", "05", "06"]:
         data_files = glob.glob("data/**/*DATA{}.CSV".format(data_file_num), recursive=True)
         print(data_files)
@@ -150,12 +150,12 @@ def add_data_tables(cur, nomis_col_id_to_category_info, place_code_to_id):
                         nomis_col_id_to_category_info[column_code].id,
                         float(d[column_code])
                     ])
-            add_counts(cur, rows, int(data_file_num), place_code_to_id)
+            add_counts(cur, rows, int(data_file_num), geo_code_to_id)
 
-def create_place_types(cur, place_types):
-    for placetype_id, placetype_name in place_types.items():
-        sql = 'insert into PLACE_TYPES (placetype_id,placetype_name) values (%s,%s)'
-        cur.execute(sql, (placetype_id, placetype_name))
+def create_geo_types(cur, geo_types):
+    for geo_type_id, geo_type_name in geo_types.items():
+        sql = 'insert into geo_types (geo_type_id,geo_type_name) values (%s,%s)'
+        cur.execute(sql, (geo_type_id, geo_type_name))
 
 def add_lsoa_lad_lookup(cur):
     for d in csv_iter("lookup/lsoa2011_lad2020.csv"):
@@ -163,15 +163,15 @@ def add_lsoa_lad_lookup(cur):
         lad = "best_fit_" + d["parent"]
         cur.execute('insert into LSOA2011_LAD2020_LOOKUP (lsoa2011code,lad2020code) values (%s,%s)', [lsoa, lad])
 
-def add_best_fit_lad2020_rows(cur, place_code_to_id):
+def add_best_fit_lad2020_rows(cur, geo_code_to_id):
     cur.execute(
         '''select lad2020code, year, category_id, sum(count) from (
                 select lad2020code, year, category_id, count from LSOA2011_LAD2020_LOOKUP
-                    join PLACES on LSOA2011_LAD2020_LOOKUP.lsoa2011code = PLACES.place_code
-                    join geo_metric on PLACES.place_id = geo_metric.place_id
+                    join geo on LSOA2011_LAD2020_LOOKUP.lsoa2011code = geo.geo_code
+                    join geo_metric on geo.geo_id = geo_metric.geo_id
             ) as A group by lad2020code, year, category_id;''')
     new_rows = [list(item) for item in cur.fetchall()]
-    add_counts(cur, new_rows, 99, place_code_to_id)
+    add_counts(cur, new_rows, 99, geo_code_to_id)
 
 def main():
     with open('secrets.json', 'r') as f:
@@ -179,19 +179,19 @@ def main():
     con = psycopg2.connect(**credentials)
     cur = con.cursor()
 
-    place_code_to_id = {}  # a map from place code (e.g. "E09000001") to place_id in the PLACES table
+    geo_code_to_id = {}  # a map from geo code (e.g. "E09000001") to geo_id in the geo table
 
     create_tables(cur)
-    create_place_types(cur, PLACE_TYPES)
+    create_geo_types(cur, GEO_TYPES)
     nomis_table_id_to_var_id = add_meta_tables(cur)
     nomis_col_id_to_category_info = add_desc_tables(cur, nomis_table_id_to_var_id)
-    add_data_tables(cur, nomis_col_id_to_category_info, place_code_to_id)
+    add_data_tables(cur, nomis_col_id_to_category_info, geo_code_to_id)
 
-    cur.execute('create index if not exists idx_counts_place_id on geo_metric(place_id)')
+    cur.execute('create index if not exists idx_counts_geo_id on geo_metric(geo_id)')
 
     add_lsoa_lad_lookup(cur)
 
-    add_best_fit_lad2020_rows(cur, place_code_to_id)
+    add_best_fit_lad2020_rows(cur, geo_code_to_id)
 
     cur.execute('create index if not exists idx_counts_category_id on geo_metric(category_id)')
 
