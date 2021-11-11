@@ -25,7 +25,8 @@ TABLES = [
         category_name TEXT,
         measurement_unit TEXT,
         stat_unit TEXT,
-        nomis_code_2011 TEXT
+        nomis_code_2011 TEXT,
+        year INTEGER
     )''',
     '''LSOA2011_LAD2020_LOOKUP(
         id SERIAL PRIMARY KEY,
@@ -95,8 +96,8 @@ def add_desc_tables(cur, nomis_table_id_to_var_id):
             table_code = col_code[:pos+2]
             print("TABLECODE", table_code)
             var_id = nomis_table_id_to_var_id[table_code]
-            sql = '''insert into nomis_category (var_id,category_name,measurement_unit,stat_unit,nomis_code_2011)
-                     values (%s,%s,%s,%s,%s)
+            sql = '''insert into nomis_category (var_id,category_name,measurement_unit,stat_unit,nomis_code_2011,year)
+                     values (%s,%s,%s,%s,%s,2011)
                      returning category_id;
                   '''
             cur.execute(sql, [
