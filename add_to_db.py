@@ -117,14 +117,14 @@ def add_counts(cur, rows, placetype_id, place_code_to_id):
     for row in rows:
         if row[0] not in place_code_to_id:
             # This place code isn't in the places table yet, so add it.
-            sql = '''insert into PLACES (place_code,place_name,placetype_id)
+            sql = '''insert into places (place_code,place_name,placetype_id)
                       values (%s,%s,%s)
                       returning place_id;
                     '''
             cur.execute(sql, (row[0], row[0] + " name TODO", placetype_id))
             place_code_to_id[row[0]] = cur.fetchone()[0]
         row[0] = place_code_to_id[row[0]]   # replace code with ID
-    sql = 'insert into COUNTS (place_id, year, category_id, count) values %s;'
+    sql = 'insert into geo_metric (place_id, year, category_id, count) values %s;'
     execute_values(cur, sql, rows)   # Much faster than executemany
 
 def add_data_tables(cur, nomis_col_id_to_category_info, place_code_to_id):
@@ -167,7 +167,7 @@ def add_best_fit_lad2020_rows(cur, place_code_to_id):
         '''select lad2020code, year, category_id, sum(count) from (
                 select lad2020code, year, category_id, count from LSOA2011_LAD2020_LOOKUP
                     join PLACES on LSOA2011_LAD2020_LOOKUP.lsoa2011code = PLACES.place_code
-                    join COUNTS on PLACES.place_id = COUNTS.place_id
+                    join geo_metric on PLACES.place_id = geo_metric.place_id
             ) as A group by lad2020code, year, category_id;''')
     new_rows = [list(item) for item in cur.fetchall()]
     add_counts(cur, new_rows, 99, place_code_to_id)
@@ -186,13 +186,13 @@ def main():
     nomis_col_id_to_category_info = add_desc_tables(cur, nomis_table_id_to_var_id)
     add_data_tables(cur, nomis_col_id_to_category_info, place_code_to_id)
 
-#    cur.execute('create index idx_counts_place_id on geo_metric(place_id)')
+    cur.execute('create index if not exists idx_counts_place_id on geo_metric(place_id)')
 
     add_lsoa_lad_lookup(cur)
 
     add_best_fit_lad2020_rows(cur, place_code_to_id)
 
-#    cur.execute('create index idx_counts_category_id on geo_metric(category_id)')
+    cur.execute('create index if not exists idx_counts_category_id on geo_metric(category_id)')
 
     con.commit()
     con.close()
