@@ -10,7 +10,7 @@ def process_items(indicators, cur):
             table = code[:5]
             column = int(code[-3:]) + 1
             code = "{}EW{:04}".format(table, column)
-            cur.execute('select * from nomis_category where nomis_code_2011 = ?', (code,))
+            cur.execute('select * from nomis_category where long_nomis_code = ?', (code,))
             db_row = cur.fetchone()
             if db_row is None:
                 continue
