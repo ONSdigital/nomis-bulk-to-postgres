@@ -5,7 +5,7 @@ import sys
 
 def get_rows(code, cur):
     cur.execute('''select place_code, count
-                    from counts join places on counts.place_id=places.place_id
+                    from geo_metric join places on geo_metric.place_id=places.place_id
                     where category_id = (select category_id from nomis_category where nomis_code_2011 = %s)''', (code,))
     rows = cur.fetchall()
     result = []

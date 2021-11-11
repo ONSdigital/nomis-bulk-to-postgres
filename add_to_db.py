@@ -6,14 +6,14 @@ from psycopg2.extras import execute_values
 from collections import namedtuple
 
 TABLES = [
-    '''COUNTS(
+    '''geo_metric(
         count_id SERIAL PRIMARY KEY,
         place_id INTEGER,
         year INTEGER,
         category_id INTEGER,
         count INTEGER
     )''',
-    '''VARIABLES(
+    '''nomis_desc(
         var_id SERIAL PRIMARY KEY,
         var_name TEXT,
         population TEXT,
@@ -32,11 +32,11 @@ TABLES = [
         lsoa2011code TEXT,
         lad2020code TEXT
     )''',
-    '''PLACE_TYPES(
+    '''place_types(
         placetype_id INTEGER PRIMARY KEY,
         placetype_name TEXT
     )''',
-    '''PLACES(
+    '''places(
         place_id SERIAL PRIMARY KEY,
         place_code TEXT,
         place_name TEXT,
@@ -72,7 +72,7 @@ def add_meta_tables(cur):
     for filename in meta_files:
         for d in csv_iter(filename):
             print(d)
-            sql = '''insert into VARIABLES (var_name,population,nomis_table_code_2011)
+            sql = '''insert into nomis_desc (var_name,population,nomis_table_code_2011)
                       values (%s,%s,%s)
                       returning var_id;
                     '''
@@ -186,13 +186,13 @@ def main():
     nomis_col_id_to_category_info = add_desc_tables(cur, nomis_table_id_to_var_id)
     add_data_tables(cur, nomis_col_id_to_category_info, place_code_to_id)
 
-    cur.execute('create index idx_counts_place_id on counts(place_id)')
+    cur.execute('create index idx_counts_place_id on geo_metric(place_id)')
 
     add_lsoa_lad_lookup(cur)
 
     add_best_fit_lad2020_rows(cur, place_code_to_id)
 
-    cur.execute('create index idx_counts_category_id on counts(category_id)')
+    cur.execute('create index idx_counts_category_id on geo_metric(category_id)')
 
     con.commit()
     con.close()
