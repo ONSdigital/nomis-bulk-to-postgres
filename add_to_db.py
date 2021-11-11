@@ -186,13 +186,13 @@ def main():
     nomis_col_id_to_category_info = add_desc_tables(cur, nomis_table_id_to_var_id)
     add_data_tables(cur, nomis_col_id_to_category_info, place_code_to_id)
 
-    cur.execute('create index idx_counts_place_id on geo_metric(place_id)')
+#    cur.execute('create index idx_counts_place_id on geo_metric(place_id)')
 
     add_lsoa_lad_lookup(cur)
 
     add_best_fit_lad2020_rows(cur, place_code_to_id)
 
-    cur.execute('create index idx_counts_category_id on geo_metric(category_id)')
+#    cur.execute('create index idx_counts_category_id on geo_metric(category_id)')
 
     con.commit()
     con.close()
