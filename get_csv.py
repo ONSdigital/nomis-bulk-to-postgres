@@ -4,7 +4,7 @@ import psycopg2
 import sys
 
 def get_rows(code, cur):
-    cur.execute('''select geo_code, count
+    cur.execute('''select geo_code, metric
                     from geo_metric join geo on geo_metric.geo_id=geo.geo_id
                     where category_id = (select category_id from nomis_category where long_nomis_code = %s)''', (code,))
     rows = cur.fetchall()
