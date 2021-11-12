@@ -15,9 +15,10 @@ TABLES = [
     )''',
     '''nomis_desc(
         var_id SERIAL PRIMARY KEY,
-        var_name TEXT,
-        population TEXT,
-        nomis_table_code_2011 TEXT
+        short_desc TEXT,
+        long_desc TEXT,
+        short_nomis_code TEXT,
+        year INTEGER
     )''',
     '''nomis_category(
         category_id SERIAL PRIMARY KEY,
@@ -73,7 +74,7 @@ def add_meta_tables(cur):
     for filename in meta_files:
         for d in csv_iter(filename):
             print(d)
-            sql = '''insert into nomis_desc (var_name,population,nomis_table_code_2011)
+            sql = '''insert into nomis_desc (short_desc,long_desc,short_nomis_code)
                       values (%s,%s,%s)
                       returning var_id;
                     '''
