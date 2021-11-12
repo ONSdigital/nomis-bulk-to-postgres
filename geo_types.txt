@@ -1,0 +1,7 @@
+1 EW
+2 Country
+3 Region
+4 LAD
+5 MSOA
+6 LSOA
+99 LAD2020_best_fit
