@@ -60,10 +60,10 @@ def csv_iter(filename):
         yield from csv.DictReader(f)
 
 def create_tables(cur):
-    cur.execute('DROP SCHEMA public CASCADE;')
-    cur.execute('CREATE SCHEMA public;')
-    for table in TABLES:
-        cur.execute('DROP TABLE IF EXISTS {}'.format(table[:table.find("(")]))
+    #cur.execute('DROP SCHEMA public CASCADE;')
+    #cur.execute('CREATE SCHEMA public;')
+    #for table in TABLES:
+    #    cur.execute('DROP TABLE IF EXISTS {}'.format(table[:table.find("(")]))
     for table in TABLES:
         cur.execute('CREATE TABLE IF NOT EXISTS {}'.format(table))
     for constraint in FOREIGN_KEY_CONSTRAINTS:
@@ -178,19 +178,19 @@ def main():
 
     geo_code_to_id = {}  # a map from geo code (e.g. "E09000001") to geo_id in the geo table
 
-    create_tables(cur)
+    #create_tables(cur)
     create_geo_types(cur)
     add_meta_tables(cur)
     nomis_col_id_to_category_info = add_desc_tables(cur)
     add_data_tables(cur, nomis_col_id_to_category_info, geo_code_to_id)
 
-    cur.execute('create index if not exists idx_counts_geo_id on geo_metric(geo_id)')
+    #cur.execute('create index if not exists idx_counts_geo_id on geo_metric(geo_id)')
 
     add_lsoa_lad_lookup(cur)
 
     add_best_fit_lad2020_rows(cur, geo_code_to_id)
 
-    cur.execute('create index if not exists idx_counts_category_id on geo_metric(category_id)')
+    #cur.execute('create index if not exists idx_counts_category_id on geo_metric(category_id)')
 
     con.commit()
     con.close()
