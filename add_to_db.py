@@ -8,53 +8,50 @@ from collections import namedtuple
 TABLES = [
     '''geo_metric(
         id SERIAL PRIMARY KEY,
-        geo_id INTEGER,
-        year INTEGER,
-        category_id INTEGER,
-        metric INTEGER
+        geo_id INTEGER NOT NULL,
+        year INTEGER NOT NULL,
+        category_id INTEGER NOT NULL,
+        metric INTEGER NOT NULL
     )''',
     '''nomis_desc(
-        var_id SERIAL PRIMARY KEY,
-        short_desc TEXT,
-        long_desc TEXT,
-        short_nomis_code TEXT,
-        year INTEGER
+        id SERIAL PRIMARY KEY NOT NULL,
+        short_desc TEXT NOT NULL,
+        long_desc TEXT NOT NULL,
+        short_nomis_code TEXT NOT NULL,
+        year INTEGER NOT NULL
     )''',
     '''nomis_category(
-        category_id SERIAL PRIMARY KEY,
-        var_id INTEGER,
-        nomis_desc TEXT,
-        measurement_unit TEXT,
-        stat_unit TEXT,
-        long_nomis_code TEXT,
-        year INTEGER
+        id SERIAL PRIMARY KEY,
+        nomis_desc_id INTEGER NOT NULL,
+        category_name TEXT NOT NULL,
+        measurement_unit TEXT NOT NULL,
+        stat_unit TEXT NOT NULL,
+        long_nomis_code TEXT NOT NULL,
+        year INTEGER NOT NULL
     )''',
     '''LSOA2011_LAD2020_LOOKUP(
         id SERIAL PRIMARY KEY,
-        lsoa2011code TEXT,
-        lad2020code TEXT
+        lsoa2011code TEXT NOT NULL,
+        lad2020code TEXT NOT NULL
     )''',
-    '''geo_types(
-        geo_type_id INTEGER PRIMARY KEY,
-        geo_type_name TEXT
+    '''geo_type(
+        id INTEGER PRIMARY KEY,
+        geo_type_name TEXT NOT NULL
     )''',
     '''geo(
-        geo_id SERIAL PRIMARY KEY,
-        geo_code TEXT,
-        geo_name TEXT,
-        geo_type_id INTEGER
+        id SERIAL PRIMARY KEY,
+        geo_code TEXT NOT NULL,
+        geo_name TEXT NOT NULL,
+        geo_type_id INTEGER NOT NULL
     )'''
 ]
 
-GEO_TYPES = {
-    1: "EW",
-    2: "Country",
-    3: "Region",
-    4: "LAD",
-    5: "MSOA",
-    6: "LSOA",
-    99: "LAD2020_best_fit"
-}
+FOREIGN_KEY_CONSTRAINTS = [
+    "ALTER TABLE geo_metric ADD CONSTRAINT fk_geo FOREIGN KEY (geo_id) REFERENCES geo(id);",
+    "ALTER TABLE geo_metric ADD CONSTRAINT fk_nomis_category FOREIGN KEY (category_id) REFERENCES nomis_category(id);",
+    "ALTER TABLE geo ADD CONSTRAINT fk_geo_type FOREIGN KEY (geo_type_id) REFERENCES geo_type(id);",
+    "ALTER TABLE nomis_category ADD CONSTRAINT fk_nomis_desc  FOREIGN KEY (nomis_desc_id) REFERENCES nomis_desc(id);"
+]
 
 CategoryInfo = namedtuple('CategoryInfo', ['id', 'measurement_unit'])
 
@@ -63,27 +60,25 @@ def csv_iter(filename):
         yield from csv.DictReader(f)
 
 def create_tables(cur):
+    cur.execute('DROP SCHEMA public CASCADE;')
+    cur.execute('CREATE SCHEMA public;')
     for table in TABLES:
         cur.execute('DROP TABLE IF EXISTS {}'.format(table[:table.find("(")]))
     for table in TABLES:
         cur.execute('CREATE TABLE IF NOT EXISTS {}'.format(table))
+    for constraint in FOREIGN_KEY_CONSTRAINTS:
+        cur.execute(constraint)
 
 def add_meta_tables(cur):
-    nomis_table_id_to_var_id = {}
     meta_files = glob.glob("data/**/*META*.CSV", recursive=True)
     for filename in meta_files:
         for d in csv_iter(filename):
             print(d)
-            sql = '''insert into nomis_desc (short_desc,long_desc,short_nomis_code)
-                      values (%s,%s,%s)
-                      returning var_id;
-                    '''
+            sql = '''insert into nomis_desc (short_desc,long_desc,short_nomis_code,year) values (%s,%s,%s,2011);'''
             cur.execute(sql, [d["DatasetTitle"], d["StatisticalPopulations"], d["DatasetId"]])
-            nomis_table_id_to_var_id[d["DatasetId"]] = cur.fetchone()[0]
         print()
-    return nomis_table_id_to_var_id
 
-def add_desc_tables(cur, nomis_table_id_to_var_id):
+def add_desc_tables(cur):
     nomis_col_id_to_category_info = {}
     desc_files = glob.glob("data/**/*DESC*.CSV", recursive=True)
     print(desc_files)
@@ -96,13 +91,12 @@ def add_desc_tables(cur, nomis_table_id_to_var_id):
                 continue
             table_code = col_code[:pos+2]
             print("TABLECODE", table_code)
-            var_id = nomis_table_id_to_var_id[table_code]
-            sql = '''insert into nomis_category (var_id,nomis_desc,measurement_unit,stat_unit,long_nomis_code,year)
-                     values (%s,%s,%s,%s,%s,2011)
-                     returning category_id;
+            sql = '''insert into nomis_category (nomis_desc_id,category_name,measurement_unit,stat_unit,long_nomis_code,year)
+                     values ((select id from nomis_desc where short_nomis_code = %s),%s,%s,%s,%s,2011)
+                     returning id;
                   '''
             cur.execute(sql, [
-                var_id,
+                table_code,
                 d["ColumnVariableDescription"],
                 d["ColumnVariableMeasurementUnit"],
                 d["ColumnVariableStatisticalUnit"],
@@ -121,7 +115,7 @@ def add_counts(cur, rows, geo_type_id, geo_code_to_id):
             # This geo code isn't in the geo table yet, so add it.
             sql = '''insert into geo (geo_code,geo_name,geo_type_id)
                       values (%s,%s,%s)
-                      returning geo_id;
+                      returning id;
                     '''
             cur.execute(sql, (row[0], row[0] + " name TODO", geo_type_id))
             geo_code_to_id[row[0]] = cur.fetchone()[0]
@@ -153,10 +147,12 @@ def add_data_tables(cur, nomis_col_id_to_category_info, geo_code_to_id):
                     ])
             add_counts(cur, rows, int(data_file_num), geo_code_to_id)
 
-def create_geo_types(cur, geo_types):
-    for geo_type_id, geo_type_name in geo_types.items():
-        sql = 'insert into geo_types (geo_type_id,geo_type_name) values (%s,%s)'
-        cur.execute(sql, (geo_type_id, geo_type_name))
+def create_geo_types(cur):
+    with open("geo_types.txt", "r") as f:
+        for line in f:
+            geo_type_id, geo_type_name = line.strip().split()
+            sql = 'insert into geo_type (id,geo_type_name) values (%s,%s)'
+            cur.execute(sql, (int(geo_type_id), geo_type_name))
 
 def add_lsoa_lad_lookup(cur):
     for d in csv_iter("lookup/lsoa2011_lad2020.csv"):
@@ -169,7 +165,7 @@ def add_best_fit_lad2020_rows(cur, geo_code_to_id):
         '''select lad2020code, year, category_id, sum(metric) from (
                 select lad2020code, year, category_id, metric from LSOA2011_LAD2020_LOOKUP
                     join geo on LSOA2011_LAD2020_LOOKUP.lsoa2011code = geo.geo_code
-                    join geo_metric on geo.geo_id = geo_metric.geo_id
+                    join geo_metric on geo.id = geo_metric.geo_id
             ) as A group by lad2020code, year, category_id;''')
     new_rows = [list(item) for item in cur.fetchall()]
     add_counts(cur, new_rows, 99, geo_code_to_id)
@@ -183,9 +179,9 @@ def main():
     geo_code_to_id = {}  # a map from geo code (e.g. "E09000001") to geo_id in the geo table
 
     create_tables(cur)
-    create_geo_types(cur, GEO_TYPES)
-    nomis_table_id_to_var_id = add_meta_tables(cur)
-    nomis_col_id_to_category_info = add_desc_tables(cur, nomis_table_id_to_var_id)
+    create_geo_types(cur)
+    add_meta_tables(cur)
+    nomis_col_id_to_category_info = add_desc_tables(cur)
     add_data_tables(cur, nomis_col_id_to_category_info, geo_code_to_id)
 
     cur.execute('create index if not exists idx_counts_geo_id on geo_metric(geo_id)')

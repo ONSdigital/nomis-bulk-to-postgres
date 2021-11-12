@@ -4,10 +4,10 @@ import psycopg2
 import sys
 
 def get_rows(table_code, geo_code, cur):
-    cur.execute('''select long_nomis_code, nomis_desc, count
-                    from geo_metric join nomis_category on geo_metric.category_id=nomis_category.category_id
-                    where nomis_category.var_id = (select var_id from nomis_desc where short_nomis_code = %s)
-                    and geo_metric.geo_id = (select geo_id from geo where geo_code = %s)''', (table_code, geo_code))
+    cur.execute('''select long_nomis_code, category_name, metric
+                    from geo_metric join nomis_category on geo_metric.category_id=nomis_category.id
+                    where nomis_category.nomis_desc_id = (select id from nomis_desc where short_nomis_code = %s)
+                    and geo_metric.geo_id = (select id from geo where geo_code = %s)''', (table_code, geo_code))
     return cur.fetchall()
 
 def main():
