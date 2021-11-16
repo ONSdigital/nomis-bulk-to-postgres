@@ -10,6 +10,19 @@ pip install psycopg2-binary
 pip install q
 ```
 
+## Config
+
+DSN details for Postgres should be in `secrets.json`, eg.
+
+```
+{
+  "host":"localhost",
+  "database":"census",
+  "user":"steve",
+  "password":"steve"
+}
+```
+
 ## Useage
 
 `./download-data.sh` gets lots of bulk data from Nomis, and `python add_to_db.py` puts it all in a Postgres database.
