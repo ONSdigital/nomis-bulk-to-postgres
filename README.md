@@ -2,11 +2,13 @@
 
 ## Installation
 
+```
 python3 -m venv bulk
 . ./bulk/bin/activate
 pip install --upgrade pip
 pip install psycopg2-binary
 pip install q
+```
 
 ## Useage
 
