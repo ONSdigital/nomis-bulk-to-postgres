@@ -75,7 +75,12 @@ def add_meta_tables(cur):
         for d in csv_iter(filename):
             print(d)
             sql = '''insert into nomis_desc (short_desc,long_desc,short_nomis_code,year) values (%s,%s,%s,2011);'''
-            cur.execute(sql, [d["DatasetTitle"], d["StatisticalPopulations"], d["DatasetId"]])
+
+            import q;
+            q(d["DatasetTitle"])
+
+            if "Cyfradd" not in d["DatasetTitle"] :
+                cur.execute(sql, [d["DatasetTitle"], d["StatisticalPopulations"], d["DatasetId"]])
         print()
 
 def add_desc_tables(cur):
@@ -151,6 +156,9 @@ def create_geo_types(cur):
     with open("geo_types.txt", "r") as f:
         for line in f:
             geo_type_id, geo_type_name = line.strip().split()
+            import q
+            q(geo_type_id)
+            q(geo_type_name)
             sql = 'insert into geo_type (id,geo_type_name) values (%s,%s)'
             cur.execute(sql, (int(geo_type_id), geo_type_name))
 
