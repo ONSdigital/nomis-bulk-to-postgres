@@ -10,6 +10,13 @@ pip install psycopg2-binary
 pip install q
 ```
 
+## Database creation
+
+Now done by 
+```
+cd dp-find-insights-poc-api && make update-schema
+
+
 ## Config
 
 DSN details for Postgres should be in `secrets.json`, eg.
