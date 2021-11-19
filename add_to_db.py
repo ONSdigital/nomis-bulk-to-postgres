@@ -142,8 +142,6 @@ def add_data_tables(cur, nomis_col_id_to_category_info, geo_code_to_id):
                         continue
                     if column_code not in nomis_col_id_to_category_info:
                         continue
-                    if nomis_col_id_to_category_info[column_code].measurement_unit != 'Count':
-                        continue
                     rows.append([
                         geog_code,
                         2011,
