@@ -5,69 +5,11 @@ import psycopg2
 from psycopg2.extras import execute_values
 from collections import namedtuple
 
-TABLES = [
-    '''geo_metric(
-        id SERIAL PRIMARY KEY,
-        geo_id INTEGER NOT NULL,
-        year INTEGER NOT NULL,
-        category_id INTEGER NOT NULL,
-        metric INTEGER NOT NULL
-    )''',
-    '''nomis_desc(
-        id SERIAL PRIMARY KEY NOT NULL,
-        short_desc TEXT NOT NULL,
-        long_desc TEXT NOT NULL,
-        short_nomis_code TEXT NOT NULL,
-        year INTEGER NOT NULL
-    )''',
-    '''nomis_category(
-        id SERIAL PRIMARY KEY,
-        nomis_desc_id INTEGER NOT NULL,
-        category_name TEXT NOT NULL,
-        measurement_unit TEXT NOT NULL,
-        stat_unit TEXT NOT NULL,
-        long_nomis_code TEXT NOT NULL,
-        year INTEGER NOT NULL
-    )''',
-    '''LSOA2011_LAD2020_LOOKUP(
-        id SERIAL PRIMARY KEY,
-        lsoa2011code TEXT NOT NULL,
-        lad2020code TEXT NOT NULL
-    )''',
-    '''geo_type(
-        id INTEGER PRIMARY KEY,
-        geo_type_name TEXT NOT NULL
-    )''',
-    '''geo(
-        id SERIAL PRIMARY KEY,
-        geo_code TEXT NOT NULL,
-        geo_name TEXT NOT NULL,
-        geo_type_id INTEGER NOT NULL
-    )'''
-]
-
-FOREIGN_KEY_CONSTRAINTS = [
-    "ALTER TABLE geo_metric ADD CONSTRAINT fk_geo FOREIGN KEY (geo_id) REFERENCES geo(id);",
-    "ALTER TABLE geo_metric ADD CONSTRAINT fk_nomis_category FOREIGN KEY (category_id) REFERENCES nomis_category(id);",
-    "ALTER TABLE geo ADD CONSTRAINT fk_geo_type FOREIGN KEY (geo_type_id) REFERENCES geo_type(id);",
-    "ALTER TABLE nomis_category ADD CONSTRAINT fk_nomis_desc  FOREIGN KEY (nomis_desc_id) REFERENCES nomis_desc(id);"
-]
-
 CategoryInfo = namedtuple('CategoryInfo', ['id', 'measurement_unit'])
 
 def csv_iter(filename):
     with open(filename, newline='') as f:
         yield from csv.DictReader(f)
-
-def create_tables(cur):
-    #cur.execute('DROP SCHEMA public CASCADE;')
-    #cur.execute('CREATE SCHEMA public;')
-    #for table in TABLES:
-    #    cur.execute('DROP TABLE IF EXISTS {}'.format(table[:table.find("(")]))
-    for table in TABLES:
-        cur.execute('CREATE TABLE IF NOT EXISTS {}'.format(table))
-    for constraint in FOREIGN_KEY_CONSTRAINTS:
-        cur.execute(constraint)
 
 def add_meta_tables(cur):
     meta_files = glob.glob("data/**/*META*.CSV", recursive=True)
@@ -184,7 +126,6 @@ def main():
 
     geo_code_to_id = {}  # a map from geo code (e.g. "E09000001") to geo_id in the geo table
 
-    #create_tables(cur)
     create_geo_types(cur)
     add_meta_tables(cur)
     nomis_col_id_to_category_info = add_desc_tables(cur)
