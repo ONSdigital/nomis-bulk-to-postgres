@@ -125,7 +125,7 @@ def add_counts(cur, rows, geo_type_id, geo_code_to_id):
             cur.execute(sql, (row[0], row[0] + " name TODO", geo_type_id))
             geo_code_to_id[row[0]] = cur.fetchone()[0]
         row[0] = geo_code_to_id[row[0]]   # replace code with ID
-    sql = 'insert into geo_metric (geo_id, year, category_id, metric) values %s;'
+    sql = 'insert into geo_metric (geo_id, data_ver_id, category_id, metric) values %s;'
     execute_values(cur, sql, rows)   # Much faster than executemany
 
 def add_data_tables(cur, nomis_col_id_to_category_info, geo_code_to_id):
@@ -144,7 +144,7 @@ def add_data_tables(cur, nomis_col_id_to_category_info, geo_code_to_id):
                         continue
                     rows.append([
                         geog_code,
-                        2011,
+                        1,
                         nomis_col_id_to_category_info[column_code].id,
                         float(d[column_code])
                     ])
@@ -168,11 +168,11 @@ def add_lsoa_lad_lookup(cur):
 
 def add_best_fit_lad2020_rows(cur, geo_code_to_id):
     cur.execute(
-        '''select lad2020code, year, category_id, sum(metric) from (
-                select lad2020code, year, category_id, metric from LSOA2011_LAD2020_LOOKUP
+        '''select lad2020code, data_ver_id, category_id, sum(metric) from (
+                select lad2020code, data_ver_id, category_id, metric from LSOA2011_LAD2020_LOOKUP
                     join geo on LSOA2011_LAD2020_LOOKUP.lsoa2011code = geo.geo_code
                     join geo_metric on geo.id = geo_metric.geo_id
-            ) as A group by lad2020code, year, category_id;''')
+            ) as A group by lad2020code, data_ver_id, category_id;''')
     new_rows = [list(item) for item in cur.fetchall()]
     add_counts(cur, new_rows, 99, geo_code_to_id)
 
