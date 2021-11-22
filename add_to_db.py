@@ -56,15 +56,15 @@ def add_desc_tables(cur):
         print()
     return nomis_col_id_to_category_info
 
-def add_counts(cur, rows, geo_type_id, geo_code_to_id):
+def add_counts(cur, rows, type_id, geo_code_to_id):
     for row in rows:
         if row[0] not in geo_code_to_id:
             # This geo code isn't in the geo table yet, so add it.
-            sql = '''insert into geo (geo_code,geo_name,geo_type_id)
+            sql = '''insert into geo (code,name,type_id)
                       values (%s,%s,%s)
                       returning id;
                     '''
-            cur.execute(sql, (row[0], row[0] + " name TODO", geo_type_id))
+            cur.execute(sql, (row[0], row[0] + " name TODO", type_id))
             geo_code_to_id[row[0]] = cur.fetchone()[0]
         row[0] = geo_code_to_id[row[0]]   # replace code with ID
     sql = 'insert into geo_metric (geo_id, data_ver_id, category_id, metric) values %s;'
@@ -95,12 +95,12 @@ def add_data_tables(cur, nomis_col_id_to_category_info, geo_code_to_id):
 def create_geo_types(cur):
     with open("geo_types.txt", "r") as f:
         for line in f:
-            geo_type_id, geo_type_name = line.strip().split()
+            type_id, name = line.strip().split()
             import q
-            q(geo_type_id)
-            q(geo_type_name)
-            sql = 'insert into geo_type (id,geo_type_name) values (%s,%s)'
-            cur.execute(sql, (int(geo_type_id), geo_type_name))
+            q(type_id)
+            q(name)
+            sql = 'insert into geo_type (id,name) values (%s,%s)'
+            cur.execute(sql, (int(type_id), name))
 
 def add_lsoa_lad_lookup(cur):
     for d in csv_iter("lookup/lsoa2011_lad2020.csv"):
@@ -112,7 +112,7 @@ def add_best_fit_lad2020_rows(cur, geo_code_to_id):
     cur.execute(
         '''select lad2020code, data_ver_id, category_id, sum(metric) from (
                 select lad2020code, data_ver_id, category_id, metric from LSOA2011_LAD2020_LOOKUP
-                    join geo on LSOA2011_LAD2020_LOOKUP.lsoa2011code = geo.geo_code
+                    join geo on LSOA2011_LAD2020_LOOKUP.lsoa2011code = geo.code
                     join geo_metric on geo.id = geo_metric.geo_id
             ) as A group by lad2020code, data_ver_id, category_id;''')
     new_rows = [list(item) for item in cur.fetchall()]
