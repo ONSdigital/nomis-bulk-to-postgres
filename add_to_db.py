@@ -16,7 +16,7 @@ def add_meta_tables(cur):
     for filename in meta_files:
         for d in csv_iter(filename):
             print(d)
-            sql = '''insert into nomis_desc (name,pop_stat,short_nomis_code,year) values (%s,%s,%s,2011);'''
+            sql = '''insert into nomis_desc (name,pop_stat,short_nomis_code,year,nomis_topic_id) values (%s,%s,%s,2011,0);'''
 
             import q;
             q(d["DatasetTitle"])
