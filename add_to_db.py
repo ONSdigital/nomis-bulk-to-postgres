@@ -133,9 +133,9 @@ def main():
 
     #cur.execute('create index if not exists idx_counts_geo_id on geo_metric(geo_id)')
 
-    add_lsoa_lad_lookup(cur)
+    #add_lsoa_lad_lookup(cur)
 
-    add_best_fit_lad2020_rows(cur, geo_code_to_id)
+    #add_best_fit_lad2020_rows(cur, geo_code_to_id)
 
     #cur.execute('create index if not exists idx_counts_category_id on geo_metric(category_id)')
 
