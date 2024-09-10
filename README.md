@@ -1,5 +1,7 @@
 # A script for getting lots of bulk data from Nomis
 
+⚠️ This repository will be archived in September 2024 as it is no longer in development. ⚠️
+
 ## Installation
 
 ```
